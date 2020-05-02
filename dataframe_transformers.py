@@ -1,11 +1,43 @@
+from typing import Dict, List
+
 from sklearn.preprocessing import StandardScaler
 import numpy as np
 import pandas as pd
 from sklearn.base import BaseEstimator, TransformerMixin
 
-"""
-This pipelines work on on pandas dataframes
-"""
+
+class CatColsToMeanResponseValue(BaseEstimator, TransformerMixin):
+    def __init__(self, p: float):
+        self.cols_to_mpr: Dict[str:Dict[str, float]] = {}
+
+    def fit(self, X, y):
+        for col in X.columns:
+            temp_df = pd.DataFrame([X[col], y]).T
+            self.cols_to_mpr[col] = temp_df.groupby(col).mean().to_dict()[y.name]
+        return self
+
+    def transform(self, X):
+        assert isinstance(X, pd.DataFrame)
+        for col in X.columns:
+
+            X[col] = X[col].map(self.cols_to_mpr[col])
+        return X
+
+
+class NanColumnsRemover(BaseEstimator, TransformerMixin):
+    # removes columns with more than p% Nan
+    def __init__(self, p: float):
+        self.p = p
+        self.columns_to_remove = None
+
+    def fit(self, X, y=None):
+        cols_nan_p = X.notna().sum() / X.shape[0]
+        self.columns_to_remove = cols_nan_p[cols_nan_p > self.p].index.tolist()
+        return self
+
+    def transform(self, X):
+        assert isinstance(X, pd.DataFrame)
+        return X.drop(columns=self.columns_to_remove)
 
 
 # selects columns that fits a given data type
@@ -21,10 +53,10 @@ class TypeSelector(BaseEstimator, TransformerMixin):
         return X.select_dtypes(include=[self.dtype])
 
 
-# transforms dype of an object column
 class ObjectsColumnaAsType(BaseEstimator, TransformerMixin):
     def __init__(self):
-        self.unique_values = {}
+        # transforms dype of an object column
+        self.unique_values = {}  # key: colname, value: list of unique_items
 
     def fit(self, X, y=None):
         for col in X.select_dtypes(include='object').columns:
@@ -45,8 +77,8 @@ class ObjectsColumnaAsType(BaseEstimator, TransformerMixin):
         return X
 
 
-# fill missing values
 class PandasImputer(BaseEstimator, TransformerMixin):
+    # fill missing values
     fill_with = {'mean': np.mean, 'most_frequent': pd.Series.mode}
 
     def __init__(self, strategy):
@@ -69,8 +101,8 @@ class PandasImputer(BaseEstimator, TransformerMixin):
         return X
 
 
-# weapper of StandardScaler()
 class PandasStandardScaler(BaseEstimator, TransformerMixin):
+    # weapper of StandardScaler()
     def __init__(self):
         self.transformer = None
         self.cols = None
@@ -84,3 +116,25 @@ class PandasStandardScaler(BaseEstimator, TransformerMixin):
     def transform(self, X):
         X.loc[:, self.cols] = self.transformer.transform(X[self.cols])
         return X
+
+
+class IdentityTransformer(BaseEstimator, TransformerMixin):
+
+    def fit(self, X, y):
+        return self
+
+    def transform(self, X):
+        assert isinstance(X, pd.DataFrame)
+        return X
+
+
+class ColumnRemover(BaseEstimator, TransformerMixin):
+    def __init__(self, cols: List[str]):
+        self.cols = cols
+
+    def fit(self, X, y = None):
+        return self
+
+    def transform(self, X):
+        assert isinstance(X, pd.DataFrame)
+        return X.drop(columns = self.cols)

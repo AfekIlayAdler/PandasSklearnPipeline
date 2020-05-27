@@ -6,20 +6,32 @@ import pandas as pd
 from sklearn.base import BaseEstimator, TransformerMixin
 
 
-class CatToInt(BaseEstimator, TransformerMixin):
+class ColAsInt(BaseEstimator, TransformerMixin):
 
-    def __init__(self):
-        self.cat_to_ints = {}
-
-    def fit(self, X, y):
-        for col in X.columns:
-            label_encoder = LabelEncoder()
-            label_encoder.fit(X[col])
-            self.cat_to_ints[col] = label_encoder
+    def fit(self, X, y=None):
+        return self
 
     def transform(self, X):
         for col in X.columns:
-            X[col] = self.cat_to_ints[col].transform(X[col])
+            X[col] = X[col].astype(int).astype('category')
+        return X
+
+
+class CatToInt(BaseEstimator, TransformerMixin):
+    def __init__(self):
+        self.cat_to_ints = {}
+
+    def fit(self, X, y=None):
+        for col in X.columns:
+            temp_df = X[[col]]
+            temp_df['new_values'] = pd.factorize(temp_df[col])[0]
+            temp_df = temp_df.drop_duplicates()
+            self.cat_to_ints[col] = temp_df.set_index(col).to_dict()['new_values']
+        return self
+
+    def transform(self, X):
+        for col in X.columns:
+            X[col] = X[col].map(self.cat_to_ints[col])
             X[col] = X[col].astype('category')
         return X
 
@@ -68,7 +80,7 @@ class TypeSelector(BaseEstimator, TransformerMixin):
     def transform(self, X):
         assert isinstance(X, pd.DataFrame)
         if self.dtype == 'bool':
-            return X.select_dtypes(include=[self.dtype])*1
+            return X.select_dtypes(include=[self.dtype]) * 1
         return X.select_dtypes(include=[self.dtype])
 
 

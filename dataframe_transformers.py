@@ -1,9 +1,27 @@
 from typing import Dict, List
 
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import StandardScaler, LabelEncoder
 import numpy as np
 import pandas as pd
 from sklearn.base import BaseEstimator, TransformerMixin
+
+
+class CatToInt(BaseEstimator, TransformerMixin):
+
+    def __init__(self):
+        self.cat_to_ints = {}
+
+    def fit(self, X, y):
+        for col in X.columns:
+            label_encoder = LabelEncoder()
+            label_encoder.fit(X[col])
+            self.cat_to_ints[col] = label_encoder
+
+    def transform(self, X):
+        for col in X.columns:
+            X[col] = self.cat_to_ints[col].transform(X[col])
+            X[col] = X[col].astype('category')
+        return X
 
 
 class CatColsToMeanResponseValue(BaseEstimator, TransformerMixin):
@@ -19,7 +37,6 @@ class CatColsToMeanResponseValue(BaseEstimator, TransformerMixin):
     def transform(self, X):
         assert isinstance(X, pd.DataFrame)
         for col in X.columns:
-
             X[col] = X[col].map(self.cols_to_mpr[col])
         return X
 
@@ -31,7 +48,7 @@ class NanColumnsRemover(BaseEstimator, TransformerMixin):
         self.columns_to_remove = None
 
     def fit(self, X, y=None):
-        cols_nan_p = X.notna().sum() / X.shape[0]
+        cols_nan_p = X.isna().sum() / X.shape[0]
         self.columns_to_remove = cols_nan_p[cols_nan_p > self.p].index.tolist()
         return self
 
@@ -50,6 +67,8 @@ class TypeSelector(BaseEstimator, TransformerMixin):
 
     def transform(self, X):
         assert isinstance(X, pd.DataFrame)
+        if self.dtype == 'bool':
+            return X.select_dtypes(include=[self.dtype])*1
         return X.select_dtypes(include=[self.dtype])
 
 
@@ -132,9 +151,9 @@ class ColumnRemover(BaseEstimator, TransformerMixin):
     def __init__(self, cols: List[str]):
         self.cols = cols
 
-    def fit(self, X, y = None):
+    def fit(self, X, y=None):
         return self
 
     def transform(self, X):
         assert isinstance(X, pd.DataFrame)
-        return X.drop(columns = self.cols)
+        return X.drop(columns=self.cols)

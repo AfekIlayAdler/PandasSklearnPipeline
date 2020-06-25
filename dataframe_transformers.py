@@ -6,7 +6,7 @@ import pandas as pd
 from sklearn.base import BaseEstimator, TransformerMixin
 
 
-class ColAsInt(BaseEstimator, TransformerMixin):
+class ColAsCategory(BaseEstimator, TransformerMixin):
 
     def fit(self, X, y=None):
         return self
@@ -120,6 +120,7 @@ class PandasImputer(BaseEstimator, TransformerMixin):
 
     def fit(self, X, y=None):
         for col in X.columns:
+
             if self.strategy == 'most_frequent':
                 self.missing_values_map[col] = self.imputer(X[col]).values[0]
             else:
@@ -128,7 +129,16 @@ class PandasImputer(BaseEstimator, TransformerMixin):
 
     def transform(self, X):
         for col in X.columns:
-            X[col] = X[col].fillna(self.missing_values_map[col])
+            try:
+                X[col] = X[col].fillna(self.missing_values_map[col])
+            except:
+                try:
+                    print(f"imputed diffrently for col:   {col}")
+                    new_val = X[col][X[col].notna()].mode()[0]
+                    X[col] = X[col].fillna(new_val)
+                except:
+                    print(f"imputed constant value for col: {col} shape of dataframe is {X.shape}")
+                    X[col] = 1
         return X
 
 
